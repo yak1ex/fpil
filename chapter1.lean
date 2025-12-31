@@ -460,3 +460,84 @@ def allFirewood : List Firewood := [
 #eval allFirewood
 
 /- 1.6.5 Exercises -/
+def lastElement {α : Type} (xs : List α) : Option α :=
+  match xs with
+  | [] => none
+  | [x] => some x
+  | _ :: ys => lastElement ys
+
+#eval lastElement [1, 2, 3, 4, 5] -- some 5
+#eval lastElement ["a", "b", "c"] -- some "c"
+#eval lastElement ([] : List Nat) -- none
+
+def List.findfirst? {α : Type} (xs : List α) (predicate : α → Bool) : Option α :=
+  match xs with
+  | [] => none
+  | y :: ys =>
+    if predicate y then
+      some y
+    else
+      findfirst? ys predicate
+
+#eval List.findfirst? [1, 4, 6, 7, 8] (fun n => n % 2 == 0) -- some 4
+#eval List.findfirst? ["apple", "banana", "cherry"] (fun s => s.length > 5) -- some "banana"
+#eval List.findfirst? [3, 5, 7] (fun n => n > 10) -- none
+
+def Prod.switch {α β : Type} (pair : α × β) : β × α :=
+  (pair.snd, pair.fst)
+
+#eval Prod.switch ("hello", 42) -- (42, "hello")
+
+inductive PetName' where
+  | dog (name : String) : PetName'
+  | cat (name : String) : PetName'
+
+def animals' : List PetName' :=
+  [PetName'.dog "Spot", PetName'.cat "Tiger", PetName'.dog "Fifi", PetName'.dog "Rex", PetName'.cat "Floof"]
+
+def howManyDogs' (pets : List PetName') : Nat :=
+  match pets with
+  | [] => 0
+  | PetName'.dog _ :: morePets => howManyDogs' morePets + 1
+  | PetName'.cat _ :: morePets => howManyDogs' morePets
+
+#eval howManyDogs' animals' -- 3
+
+def zip {α β: Type} (xs : List α) (ys : List β) : List (α × β) :=
+  match (xs, ys) with
+  | ([], _) => []
+  | (x :: xs', _) =>
+    match ys with
+    | [] => []
+    | y :: ys' => (x, y) :: zip xs' ys'
+
+#eval zip [1, 2, 3] ["a", "b", "c", "d"] -- [(1, "a"), (2, "b"), (3, "c")]
+#eval zip [1, 2, 3, 4] ["x", "y"] -- [(1, "x"), (2, "y")]
+
+def take {α : Type} (n : Nat) (xs : List α) : List α :=
+  match n with
+  | Nat.zero => []
+  | Nat.succ n' =>
+    match xs with
+    | y :: ys => y :: take n' ys
+    | [] => []
+
+#eval take 3 ["bolete", "oyster"] -- ["bolete", "oyster"]
+#eval take 1 ["bolete", "oyster"] -- ["bolete"]
+#eval take 0 ["bolete", "oyster"] -- []
+
+def distrib {α β γ: Type} (p : α × (β ⊕ γ)) : (α × β) ⊕ (α × γ) :=
+  match p with
+  | (a, Sum.inl b) => Sum.inl (a, b)
+  | (a, Sum.inr c) => Sum.inr (a, c)
+
+#eval distrib ("name", (Sum.inl "Spot" : PetName)) -- Sum.inl ("name", "Spot")
+#eval distrib ("name", (Sum.inr "Alice" : PetName)) -- Sum.inr ("name", "Alice")
+
+def toSum {α : Type} (p : Bool × α) : α ⊕ α :=
+  match p with
+  | (true, a) => Sum.inl a
+  | (false, a) => Sum.inr a
+
+#eval toSum (true, 42) -- Sum.inl 42
+#eval toSum (false, 99) -- Sum.inr 99

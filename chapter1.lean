@@ -541,3 +541,233 @@ def toSum {α : Type} (p : Bool × α) : α ⊕ α :=
 
 #eval toSum (true, 42) -- Sum.inl 42
 #eval toSum (false, 99) -- Sum.inr 99
+
+/- 1.7 Additional Conveniences -/
+
+/- 1.7.1 Automatic Implicit Parameters-/
+
+def length'2 {α : Type} (xs : List α) : Nat :=
+  match xs with
+  | [] => 0
+  | _ :: ys => Nat.succ (length'2 ys)
+
+def length'3 (xs : List α) : Nat :=
+  match xs with
+  | [] => 0
+  | _ :: ys => Nat.succ (length'3 ys)
+
+/- 1.7.2 Pattern-Matching Definitions -/
+
+def length'4 : List α → Nat
+  | [] => 0
+  | _ :: ys => Nat.succ (length'4 ys)
+
+def drop : Nat → List α → List α
+  | Nat.zero, xs => xs
+  | _, [] => []
+  | Nat.succ n, _ :: xs => drop n xs
+
+def fromOption (default : α) : Option α → α
+  | none => default
+  | some x => x
+
+#eval (some "salmonberry").getD "" -- "salmonberry"
+#eval none.getD "" -- ""
+
+/- 1.7.3 Local Definitions -/
+
+def unzip' : List (α × β) → (List α × List β)
+  | [] => ([], [])
+  | (x, y) :: xys =>
+    (x :: (unzip' xys).fst, y :: (unzip' xys).snd)
+
+def unzip'' : List (α × β) → (List α × List β)
+  | [] => ([], [])
+  | (x, y) :: xys =>
+    let unzipped : List α × List β := unzip'' xys
+    (x :: unzipped.fst, y :: unzipped.snd)
+
+def unzip : List (α × β) → (List α × List β)
+  | [] => ([], [])
+  | (x, y) :: xys =>
+    let (xs, ys) := unzip xys
+    (x :: xs, y :: ys)
+
+/-
+def reverse (xs : List α) : List α :=
+  let helper : List α → List α → List α
+    | [], sofar => sofar
+    | y :: ys, sofar => helper ys (y :: sofar)
+  helper xs []
+-/
+
+def reverse (xs : List α) : List α :=
+  let rec helper : List α → List α → List α
+    | [], sofar => sofar
+    | y :: ys, sofar => helper ys (y :: sofar)
+  helper xs []
+
+/- 1.7.4 Type Inference -/
+
+def unzip'2 : List (α × β) → (List α × List β)
+  | [] => ([], [])
+  | (x, y) :: xys =>
+    let unzipped := unzip'2 xys
+    (x :: unzipped.fst, y :: unzipped.snd)
+
+def unzip'3 (pairs : List (α × β) ) :=
+  match pairs with
+  | [] => ([], [])
+  | (x, y) :: xys =>
+    let unzipped := unzip'2 xys
+    (x :: unzipped.fst, y :: unzipped.snd)
+
+#check 14 -- 14 : Nat
+#check (14 : Int) -- 14 : Int
+
+/-
+def unzip'4 pairs :=
+  match pairs with
+  | [] => ([], []) -- Invalid match expression: This pattern contains metavariables
+  | (x, y) :: xys =>
+    let unzipped := unzip'4 xys
+    (x :: unzipped.fst, y :: unzipped.snd)
+-/
+
+def id' (x : α) : α := x
+def id'2 (x : α) := x
+/-
+def id'3 x := x -- Failed to infer type of binder `x`
+-/
+
+/- 1.7.5 Simultaneous Matching -/
+
+def drop' (n : Nat) (xs : List α) : List α :=
+  match n, xs with
+  | Nat.zero, ys => ys
+  | _, [] => []
+  | Nat.succ n, _ :: ys => drop' n ys
+
+/-
+def sameLength' (xs : List α) (ys : List β) : Bool :=
+  match (xs, ys) with
+  | ([], []) => true
+  | (_ :: xs', _ :: ys') => sameLength' xs' ys'
+  | (_, _) => false
+-- fail to show termination for sameLength'
+-/
+
+def sameLength' (xs : List α) (ys : List β) : Bool :=
+  match xs, ys with
+  | [], [] => true
+  | _ :: xs', _ :: ys' => sameLength' xs' ys'
+  | _, _ => false
+
+/- 1.7.6 Natural Number Patterns -/
+
+def even' (n : Nat) : Bool :=
+  match n with
+  | 0 => true
+  | n + 1 => not (even' n)
+
+def halve : Nat → Nat
+  | Nat.zero => 0
+  | Nat.succ Nat.zero => 0
+  | Nat.succ (Nat.succ n) => halve n + 1
+
+def halve' : Nat → Nat
+  | 0 => 0
+  | 1 => 0
+  | n + 2 => halve' n + 1
+
+/-
+def halve'' : Nat → Nat
+  | 0 => 0
+  | 1 => 0
+  | 2 + n => halve'' n + 1
+-- Invalid pattern(s): snip...
+-/
+
+/- 1.7.7 Anonymous Functions -/
+
+#check fun x => x + 1 -- fun x => x + 1 : Nat → Nat
+#check fun (x : Int) => x + 1 -- fun x => x + 1 : Int → Int
+#check fun {α : Type} (x : α) => x -- fun {α} x => x : (α : Type) → α → α
+
+#check fun
+  | 0 => none
+  | n + 1 => some n
+/-
+fun x =>
+  match x with
+  | 0 => none
+  | n.succ => some n : Nat → Option Nat
+-/
+
+def double : Nat → Nat := fun
+  | 0 => 0
+  | k + 1 => double k + 2
+
+example : (· + 1) = fun x => x + 1 := by rfl
+
+#eval (· , ·) 1 2 -- (1, 2)
+#eval (fun x => x + x) 5 -- 10
+#eval (· * 2) 5 -- 10
+
+/- 1.7.8 Namespaces -/
+
+def Nat.double (x : Nat) : Nat := x * 2
+#eval (4 : Nat).double -- 8
+
+namespace NewNamespace
+def triple (x : Nat) : Nat := 3 * x
+def quadruple (x : Nat) : Nat := 2 * x + 2 * x
+end NewNamespace
+
+#check NewNamespace.triple -- NewNamespace.triple (x : Nat) : Nat
+#check NewNamespace.quadruple -- NewNamespace.quadruple (x : Nat) : Nat
+
+def timesTwelve (x : Nat) :=
+  open NewNamespace in
+  quadruple (triple x)
+
+open NewNamespace in
+#check quadruple -- NewNamespace.quadruple (x : Nat) : Nat
+-- #check quadruple -- Unknown identifier `quadruple`
+
+/- 1.7.9 if let -/
+
+inductive Inline : Type where
+  | lineBreak
+  | string : String → Inline
+  | emph : Inline → Inline
+  | strong : Inline → Inline
+
+def Inline.string? (inline : Inline) : Option String :=
+  match inline with
+  | Inline.string s => some s
+  | _ => none
+
+def Inline.string?' (inline : Inline) : Option String :=
+  if let Inline.string s := inline then
+    some s
+  else
+    none
+
+/- 1.7.10 Positional Structure Arguments -/
+
+-- #eval ⟨1, 2⟩ -- Invalid `⟨...⟩` notation: The expected type of this term could not be determined
+#eval (⟨1, 2⟩ : Point) -- { x := 1.000000, y := 2.000000 }
+
+/- 1.7.11 String Interpolation -/
+
+#eval s!"three fives is {NewNamespace.triple 5}" -- "three fives is 15"
+-- #check s!"three fives is {NewNamespace.triple}" -- failed to synthesize ToString (Nat → Nat)
+
+/- 1.8 Summary -/
+
+/- 1.8.1 Evaluating Expressions -/
+/- 1.8.2 Functions -/
+/- 1.8.3 Types -/
+/- 1.8.4 Structures and Inductive Types -/
+/- 1.8.5 Recursion -/

@@ -36,7 +36,19 @@ def process (exitCode : UInt32) (args: List String) : IO UInt32 := do
       dump stream
       process exitCode args
 
+def showHelp : IO UInt32 := do
+  let stdout ← IO.getStdout
+  stdout.putStrLn "Usage: cat [FILE]..."
+  stdout.putStrLn "       cat --help"
+  stdout.putStrLn ""
+  stdout.putStrLn "Concatenate FILE(s) to standard output."
+  stdout.putStrLn "With no FILE, or when FILE is -, read standard input."
+  stdout.putStrLn ""
+  stdout.putStrLn "--help     display this help and exit"
+  pure 0
+
 def main (args : List String): IO UInt32 :=
   match args with
   | [] => process 0 ["-"]
+  | ["--help"] => showHelp
   | _ => process 0 args

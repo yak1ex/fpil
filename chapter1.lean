@@ -17,6 +17,9 @@
 
 /- 1.2 Types -/
 
+#eval List.Perm [1, 2, 3] [3, 1, 2]
+#eval List.Perm [1, 2, 3] [3, 1, 2, 4]
+
 #eval (1 + 2 : Nat) -- 3
 #eval (1 - 2 : Nat) -- 0
 #eval (1 - 2 : Int) -- -1
@@ -28,6 +31,8 @@
 def hello := "Hello"
 def lean : String := "Lean"
 #eval String.append hello (String.append " " lean) -- "Hello Lean"
+
+def hello' (_: Unit) := "Hello" -- 疑似0引数
 
 /- 1.3.1 Defining Functions -/
 
@@ -47,8 +52,14 @@ def spaceBetween (before : String) (after : String) : String :=
 #check (add1) -- add1 : Nat → Nat
 #check (maximum) -- maximum : Nat → Nat → Nat
 
-example : Nat -> Nat := add1
+example : Nat -> Nat := add1 -- example は名前を付けない def に相当
 example : Nat -> Nat -> Nat := maximum
+def my_example : Nat -> Nat := add1
+-- def my_example : Nat -> Nat -> Nat := maximum
+-- `my_example` has already been declared
+--def example : Nat -> Nat -> Nat := maximum
+-- unexpected token 'example'; expected identifier
+def my_example2 : Nat -> Nat -> Nat := maximum
 
 #check maximum 3 -- maximum 3 : Nat → Nat
 #check spaceBetween "Hello" -- spaceBetween "Hello" : String → String
@@ -56,8 +67,22 @@ example : Nat -> Nat -> Nat := maximum
 /- 1.3.1.1 Exercises -/
 def joinStringsWith (delim : String) (first : String) (second : String) : String :=
   String.append first (String.append delim second)
+-- String.append は ++ で OK
+-- first ++ delim ++ second
+-- s!"{first}{delim}{second}" みたいにもできる
+-- method notation
+-- def joinStringsWith (connective fst sec :String)
+--   := fst.append (connective.append sec)
+#eval joinStringsWith ", " "one" "and another"
 #check joinStringsWith ": " -- joinStringsWith ": " : String → String → String
 def volume (height: Nat) (width: Nat) (depth: Nat) : Nat :=
+  height * width * depth
+#eval volume 3 4 5
+-- これだと推論通る
+def volume_ height width depth :=
+  1 * height * width * depth
+-- (height: Nat) だけでも型注釈つけるならこれで
+def volume__ (height width depth: Nat) : Nat :=
   height * width * depth
 
 /- 1.3.2 Defining Types -/
@@ -69,7 +94,12 @@ def aStr : Str := "This is a string."
 
 def NaturalNumber : Type := Nat
 -- def thirtyEight : NaturalNumber := 38
+-- hint が `set_option trace.Meta.synthInstance true` になってる
 def thirtyEight : NaturalNumber := (38 : Nat)
+/- -- オーバーロードを定義する場合
+instance {n} : OfNat NaturalNumber n where
+  ofNat := n
+-/
 
 abbrev N : Type := Nat
 def thirtyNine : N := 39

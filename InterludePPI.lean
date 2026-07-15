@@ -1,11 +1,11 @@
 /- Interlude: Propositions, Proofs, and Indexing -/
 
-def woodlanCritters : List String :=
+def woodlandCritters : List String :=
   ["headgehog", "deer", "snail" ]
 
-def hedgehog := woodlanCritters[0]
-def deer := woodlanCritters[1]
-def snail := woodlanCritters[2]
+def hedgehog := woodlandCritters[0]
+def deer := woodlandCritters[1]
+def snail := woodlandCritters[2]
 
 /-
 def oops := woodlanCritters[3]  -- failed to prove index is valid,
@@ -51,15 +51,15 @@ def third' (xs : List α) : α := xs[2] -- failed to prove index is valid
 
 def third (xs : List α) (h : xs.length > 2) : α := xs[2]
 
-#eval third woodlanCritters (by decide)  -- "snail"
+#eval third woodlandCritters (by decide)  -- "snail"
 
 /- Indexing Without Evidence -/
 
 def thirdOption (xs : List α) : Option α := xs[2]?
 
-#eval thirdOption woodlanCritters  -- some "snail"
+#eval thirdOption woodlandCritters  -- some "snail"
 #eval thirdOption ["only", "two"]  -- none
-#eval woodlanCritters[1]!  -- "deer"
+#eval woodlandCritters[1]!  -- "deer"
 
 /- Messages You May Meet -/
 
@@ -68,5 +68,32 @@ def thirdOption (xs : List α) : Option α := xs[2]?
 -/
 
 /-
-theorem onePlusOneIsStillTwo : OnePlusOneIsTwo := by simp -- `simp* made no progress
+theorem onePlusOneIsStillTwo : OnePlusOneIsTwo := by simp -- `simp` made no progress
 -/
+
+/-
+theorem onePlusOneIsStillTwo : OnePlusOneIsTwo := by decide -- failed to synthesize Decidable OnePlusOneIsTwo
+-/
+/- Needs to use `abbrev` instead of `def` -/
+
+/-
+def unsafeThird (xs : List α) : α : xs[2]! -- failed to synthesize Inhabited α
+-/
+
+/-
+#eval woodlandCritters [1] -- Function expected at woodlandCritters but this term has type List String
+-/
+
+/- Exercises -/
+
+example : 2 + 3 = 5 := by rfl
+example : 15 -8 = 7 := by rfl
+example : "Hello, ".append "world" = "Hello, world" := by rfl
+-- example : 5 < 18 := by rfl -- rfl is only for structural equiality
+
+example : 2 + 3 = 5 := by decide
+example : 15 -8 = 7 := by decide
+example : "Hello, ".append "world" = "Hello, world" := by decide
+example : 5 < 18 := by decide
+
+def fifth (xs : List α) (h : xs.length > 4) : α := xs[4]

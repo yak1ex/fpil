@@ -310,6 +310,13 @@ structure PPoint (α : Type) where
   x : α
   y : α
 
+#check PPoint.mk
+#check PPoint.mk 1
+#check @PPoint.mk Float
+#check PPoint.mk (α:=Float)
+#check (@PPoint.mk Float)
+--#check @PPoint.mk 1 -- failed to synthesize instance of type class
+
 def natOrigin : PPoint Nat :=
   { x := Nat.zero, y := Nat.zero }
 

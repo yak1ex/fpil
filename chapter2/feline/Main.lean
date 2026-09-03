@@ -26,7 +26,7 @@ def process (exitCode : UInt32) (args: List String) : IO UInt32 := do
     dump stdin
     process exitCode args
   | filename :: args =>
-    let stream ← fileStream (filename)
+    let stream ← fileStream ⟨filename⟩  -- (filename) でも filename でも通る
     match stream with
     | none =>
       process 1 args
@@ -48,5 +48,5 @@ def showHelp : IO UInt32 := do
 def main (args : List String): IO UInt32 :=
   match args with
   | [] => process 0 ["-"]
-  | ["--help"] => showHelp
+  | ["--help"] => showHelp -- This only accepts exactly one argument, "--help"
   | _ => process 0 args

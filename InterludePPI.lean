@@ -71,29 +71,20 @@ def thirdOption (xs : List α) : Option α := xs[2]?
 theorem onePlusOneIsStillTwo : OnePlusOneIsTwo := by simp -- `simp` made no progress
 -/
 
-/-
-theorem onePlusOneIsStillTwo : OnePlusOneIsTwo := by decide -- failed to synthesize Decidable OnePlusOneIsTwo
--/
-/- Needs to use `abbrev` instead of `def` -/
-
-/-
-def unsafeThird (xs : List α) : α : xs[2]! -- failed to synthesize Inhabited α
--/
-
-/-
-#eval woodlandCritters [1] -- Function expected at woodlandCritters but this term has type List String
--/
-
 /- Exercises -/
+theorem twoPlusThreeIsFive : 2 + 3 = 5 := by rfl
+theorem fifteenMinusEightIsSeven : 15 - 8 = 7 := by rfl
+theorem helloWorld : "Hello, ".append "World!" = "Hello, World!" := by rfl
+-- theorem fiveLessThanEighteen : 5 < 18 := by rfl
+-- reflexivity is not enough to prove this,
+-- because lhs and rhs are not definitionally equal,
+-- but `decide` can do it
 
-example : 2 + 3 = 5 := by rfl
-example : 15 -8 = 7 := by rfl
-example : "Hello, ".append "world" = "Hello, world" := by rfl
--- example : 5 < 18 := by rfl -- rfl is only for structural equiality
+theorem twoPlusThreeIsFive' : 2 + 3 = 5 := by decide
+theorem fifteenMinusEightIsSeven' : 15 - 8 = 7 := by decide
+theorem helloWorld' : "Hello, ".append "World!" = "Hello, World!" := by decide
+theorem fiveLessThanEighteen' : 5 < 18 := by decide
 
-example : 2 + 3 = 5 := by decide
-example : 15 -8 = 7 := by decide
-example : "Hello, ".append "world" = "Hello, world" := by decide
-example : 5 < 18 := by decide
-
+def listWithSixElements : List Nat := [1, 2, 3, 4, 5, 6]
 def fifth (xs : List α) (h : xs.length > 4) : α := xs[4]
+#eval fifth listWithSixElements (by decide)  -- 5

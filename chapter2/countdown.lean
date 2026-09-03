@@ -12,3 +12,5 @@ def runActions : List (IO Unit) → IO Unit
     runActions actions
 
   def main : IO Unit := runActions from5
+
+#eval runActions (countdown 3) -- 3 2 1 Blast off!

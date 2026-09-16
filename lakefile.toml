@@ -1,0 +1,15 @@
+name = "fpil"
+version = "0.0.0"
+defaultTargets = ["chapter1", "chapter3", "chapter4", "chapter5"]
+
+[[lean_lib]]
+name = "chapter1"
+
+[[lean_lib]]
+name = "chapter3"
+
+[[lean_lib]]
+name = "chapter4"
+
+[[lean_lib]]
+name = "chapter5"

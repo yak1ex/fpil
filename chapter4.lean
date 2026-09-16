@@ -1,3 +1,5 @@
+import chapter3
+
 /- 4. Monads -/
 
 /- 4.1. One API, Many Applications -/
@@ -173,12 +175,6 @@ def sumAndFindEvens : List Int → List Int × Int
   | i :: is =>
     let (moreEven, sum) := sumAndFindEvens is
     (if isEven i then i :: moreEven else moreEven, sum + i)
-
-/-- from chapter3.lean -/
-inductive BinTree (α : Type) where
-  | leaf : BinTree α
-  | branch : BinTree α → α → BinTree α → BinTree α
-deriving Repr
 
 def inorderSum : BinTree Int → List Int × Int
   | BinTree.leaf => ([], 0)
@@ -435,6 +431,8 @@ def bTree : BinTree Int :=
       leaf)
     3
     (branch leaf 4 leaf)
+
+deriving instance Repr for BinTree
 
 #eval BinTree.mapM increment bTree 0
 #eval BinTree.mapM saveIfEven bTree

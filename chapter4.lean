@@ -298,20 +298,18 @@ def numberState (t : BinTree α) : BinTree (Nat × α) :=
 
 /- 4.2. The Monad Type Class -/
 
-/-
-class Monad (m : Type → Type) where
+class MyMonad (m : Type → Type) where
   pure : α → m α
   bind : m α → (α → m β) → m β
--/
 
-instance : Monad Option where
+instance : MyMonad Option where
   pure x := some x
   bind opt next :=
     match opt with
     | none => none
     | some x => next x
 
-instance : Monad (Except ε) where
+instance : MyMonad (Except ε) where
   pure x := Except.ok x
   bind attempt next :=
     match attempt with
@@ -439,7 +437,7 @@ deriving instance Repr for BinTree
 
 /- 4.2.4.2 The Option Monad Contract -/
 
-instance : Monad Option where
+instance : MyMonad Option where
   pure x := some x
   bind opt next :=
     match opt with
@@ -484,7 +482,7 @@ bind v (fun x => bind (f x) g)
                | some x => g x
 -/
 
-instance : Monad Option where
+instance : MyMonad Option where
   pure x := some x
   bind opt next := none
 
@@ -499,7 +497,7 @@ bind (bind v f) g == bind v (fun x => bind (f x) g)
 bind (bind v f) g == none == bind v (fun x => bind (f x) g) -- OK
 -/
 
-instance : Monad Option where
+instance : MyMonad Option where
   pure x := some x
   bind opt next :=
     match opt with

@@ -317,7 +317,7 @@ some f <*> some x
 def map [Applicative f] (g : α → β) (x : f α) : f β :=
   pure g <*> x
 
-class Applicative' (f: Type → Type) extends Functor f where
+class MyApplicative (f: Type → Type) extends Functor f where
   pure : α → f α
   seq : f (α → β) → (Unit → f α) → f β
   map g x := seq (pure g) (fun () => x)
@@ -435,7 +435,7 @@ seq u (fun () => pure x)
 =seq (pure (fun f => f x)) (fun () => u)
 -/
 
-class Monad' (m : Type → Type) extends Applicative m where
+class MyMonad' (m : Type → Type) extends Applicative m where
   bind : m α → (α → m β) → m β
   seq f x :=
     bind f fun g =>
@@ -491,7 +491,7 @@ def Validate.OrElse
     | .ok x => .ok x
     | .errors errs2 => .errors (errs1 ++ errs2)
 
-class OrElse' (α : Type) where
+class MyOrElse (α : Type) where
   orElse : α → (Unit → α) → α
 
 -- E1 <|> E2 = OrElse.orElse E1 (fun () => E2)
@@ -511,7 +511,7 @@ def checkCompany'' (input : RawInput) :
       "birth year" "FIRM if a company" <*>
     checkName input.name
 
-class SeqRight' (f : Type → Type) where
+class MySeqRight (f : Type → Type) where
   seqRight : f α → (Unit → f β) → f β
   --seqRight (a : f α) (b: Unit → f β) : f β :=
   --  pure (fun _ x => x) <*> a <*> b ()
@@ -582,14 +582,14 @@ Validate.errors
 
 /- 5.4.2. The Alternative Class -/
 
-class Alternative' (f : Type → Type) extends Applicative f where
+class MyAlternative (f : Type → Type) extends Applicative f where
   failure : f α
   orElse : f α → (Unit → f α) → f α
 
-instance [Alternative' f] : OrElse (f α) where
-  orElse := Alternative'.orElse
+instance [Alternative f] : OrElse (f α) where
+  orElse := Alternative.orElse
 
-instance : Alternative' Option where
+instance : Alternative Option where
   failure := none
   orElse
     | some x, _ => some x
@@ -603,10 +603,10 @@ instance : Alternative Many where
   failure := .none
   orElse := Many.orElse
 
-def guard' [Alternative' f] (p : Prop) [Decidable p] : f Unit :=
+def guard' [Alternative f] (p : Prop) [Decidable p] : f Unit :=
   if p then
     pure ()
-  else Alternative'.failure
+  else Alternative.failure
 
 def Many.countdown : Nat → Many Nat
   | 0 => .none
@@ -911,3 +911,357 @@ inductive Sum'' (α : Type u) (β : Type v) : Type (max u v) where
 def stringOrType : Sum String Type := .inr Nat
 
 /- 5.5.2.1. Writing Universe-Polymorphic Definitions -/
+
+/- 5.5.2.2. Prop and Polymorphism -/
+
+def someTruePropositions : List.{0} Prop := [
+  1 + 1 = 2,
+  "Hello, " ++ "world!" = "Hello, world"
+]
+
+/- 5.6. Complete Definitions -/
+
+/- 5.6.1. Functor -/
+
+class MyFunctor (f : Type u → Type v) : Type (max (u + 1) v) where
+  map : {α β : Type u} → (α → β) → f α → f β
+  mapConst : {α β : Type u} → α → f β → f α :=
+    Function.comp map (Function.const _)
+/- (α → β) : Type (u + 1) -/
+/- (f α) (f β) : Type v -/
+
+def simpleConst (x : α) (_ : β) : α := x
+#eval [1, 2, 3].map (simpleConst "same") -- ["same", "same", "same"]
+
+#check Function.const -- Function.const.{u, v} {α : Sort u} (β : Sort v) (a : α) : β → α
+
+/- 5.6.2. Applicative -/
+
+class MyPure (f : Type u → Type v) : Type (max (u+1) v) where
+  pure {α : Type u} : α → f α
+
+class MySeq (f : Type u → Type v) : Type (max (u+1) v) where
+  seq : {α β : Type u} → f (α → β) → (Unit → f α) → f β
+
+class MySeqRight' (f : Type u → Type v) : Type (max (u+1) v) where
+  seqRight : {α β : Type u} → f α → (Unit → f β) → f β
+
+class MySeqLeft (f : Type u → Type v) : Type (max (u+1) v) where
+  seqLeft : {α β : Type u} → f α → (Unit → f β) → f α
+
+class MyApplicative' (f : Type u → Type v)
+    extends Functor f, Pure f, Seq f, SeqLeft f, SeqRight f where
+  map      := fun x y => Seq.seq (pure x) fun _ => y
+  seqLeft  := fun a b => Seq.seq (Functor.map (Function.const _) a) b
+  -- fun a b => Seq.seq ((fun x _ => x) <$> a) b
+  seqRight := fun a b => Seq.seq (Functor.map (Function.const _ id) a) b
+  -- fun a b => Seq.seq ((fun _ x => x) <$> a) b
+
+/- 5.6.3. Monad -/
+
+class MyBind (m : Type u → Type v) where
+  bind : {α β : Type u} → m α → (α → m β) → m β
+
+class MyMonad'' (m : Type u → Type v) : Type (max (u+1) v)
+    extends Applicative m, Bind m where
+  map f x      := bind x (Function.comp pure f)
+  seq f x      := bind f fun y => Functor.map y (x ())
+  seqLeft x y  := bind x fun a => bind (y ()) (fun _ => pure a)
+  seqRight x y := bind x fun _ => y ()
+
+/- 5.6.4. Exercises -/
+
+/-
+class Bind (m : Type u → Type v) where
+  bind : {α β : Type u} → m α → (α → m β) → m β
+
+class Monad (m : Type u → Type v) : Type (max (u+1) v)
+    extends Applicative m, Bind m where
+  map f x      := bind x (Function.comp pure f)
+  seq f x      := bind f fun y => Functor.map y (x ())
+  seqLeft x y  := bind x fun a => bind (y ()) (fun _ => pure a)
+  seqRight x y := bind x fun _ => y ()
+-/
+
+/-
+instance : Bind Option where
+  bind opt next :=
+    match opt with
+    | none => none
+    | some x => next x
+
+instance : Applicative Option where
+  pure x := .some x
+  seq f x :=
+    match f with
+    | none => none
+    | some g => g <$> x ()
+-/
+
+/-
+map f x := bind x (Function.comp pure f)
+= match x with
+  | none => none
+  | some x => (Function.comp some f) x
+= match x with
+  | none => none
+  | some x => some (f x)
+-/
+
+/-
+seq f x := bind f fun y => Functor.map y (x ())
+= match f with
+  | none => none
+  | some g => (fun y => Functor.map y (x ())) g
+= match f with
+  | none => none
+  | some g => Functor.map g (x ())
+= match f with
+  | none => none
+  | some g => match x () with
+              | none => none
+              | some y => some (g y)
+-/
+
+/-
+seqLeft x y  := bind x fun a => bind (y ()) (fun _ => pure a)
+= match x with
+  | none => none
+  | some z => (fun a => bind (y ()) (fun _ => some a)) z
+= match x with
+  | none => none
+  | some z => bind (y ()) (fun _ => some z)
+= match x with
+  | none => none
+  | some z => match (y ()) with
+              | none => none
+              | some zz => (fun _ => some z) zz
+= match x with
+  | none => none
+  | some z => match (y ()) with
+              | none => none
+              | some _ => some z
+-/
+
+/-
+seqRight x y := bind x fun _ => y ()
+= match x with
+  | none => none
+  | some z => (fun _ => y ()) z
+= match x with
+  | none => none
+  | some _ => y ()
+-/
+
+/-
+instance : Bind (Except ε) where
+  bind attempt next :=
+    match attempt with
+    | Except.error e => Except.error e
+    | Except.ok x => next x
+
+instance : Applicative (Except ε) where
+  pure x := .ok x
+  seq f x :=
+    match f with
+    | .error e => .error e
+    | .ok g => g <$> x ()
+-/
+
+/-
+map f x := bind x (Function.comp pure f)
+= match x with
+  | Except.error e => Except.error e
+  | Except.ok x => (Function.comp Except.ok f) x
+= match x with
+  | Except.error e => Except.error e
+  | Except.ok x => Except.ok (f x)
+-/
+
+/-
+seq f x := bind f fun y => Functor.map y (x ())
+= match f with
+  | Except.error e => Except.error e
+  | Except.ok y => (fun y => Functor.map y (x ())) y
+= match f with
+  | Except.error e => Except.error e
+  | Except.ok y => Functor.map y (x ())
+= match f with
+  | Except.error e => Except.error e
+  | Except.ok g => match x () with
+                   | Except.error e => Except.error e
+                   | Except.ok y => Except.ok (g y)
+-/
+
+/-
+seqLeft x y := bind x fun a => bind (y ()) (fun _ => pure a)
+= match x with
+  | Except.error e => Except.error e
+  | Except.ok a => (fun a => bind (y ()) (fun _ => Except.ok a)) a
+= match x with
+  | Except.error e => Except.error e
+  | Except.ok a => bind (y ()) (fun _ => Except.ok a)
+= match x with
+  | Except.error e => Except.error e
+  | Except.ok a => match y () with
+                   | Except.error e => Except.error e
+                   | Except.ok b => (fun _ => Except.ok a) b
+= match x with
+  | Except.error e => Except.error e
+  | Except.ok a => match y () with
+                   | Except.error e => Except.error e
+                   | Except.ok _  => Except.ok a
+-/
+
+/-
+seqRight x y := bind x fun _ => y ()
+= match x with
+  | Except.error e => Except.error e
+  | Except.ok x => (fun _ => y ()) x
+= match x with
+  | Except.error e => Except.error e
+  | Except.ok _ => y ()
+-/
+
+#print SeqRight
+
+/-
+class Monad (m : Type u → Type v) : Type (max (u+1) v)
+    extends Applicative m, Bind m where
+  map f x      := bind x (Function.comp pure f)
+  seq f x      := bind f fun y => Functor.map y (x ())
+  seqLeft x y  := bind x fun a => bind (y ()) (fun _ => pure a)
+  seqRight x y := bind x fun _ => y ()
+
+/-
+Monad contract
+bind (pure v) f = f v
+bind v pure = v
+bind (bind v f) g = bind v (fun x => bind (f x) g)
+-/
+-/
+
+/-
+Functor contract
+1. (id <$> x =) map id x = x
+map id x
+= bind x (Function.comp pure id)
+= bind x (id ∘ pure)
+= bind x pure
+= x
+2. map (fun y => f (g y)) x = map f (map g x)
+map (fun y => f (g y)) x
+= bind x (Function.comp pure (fun y => f (g y))
+= bind x (fun y => pure (f (g y)))
+map f (map g x)
+= map f (bind x (Function.comp pure g))
+= map f (bind x (Function.comp pure g))
+= bind (bind x (Function.comp pure g)) (Functionl.comp pure f)
+= bind x (fun x => bind ((Function.comp pure g) x) (Functionl.comp pure f))
+= bind x (fun x => bind (pure (g x)) (Functionl.comp pure f))
+= bind x (fun x => (Functionl.comp pure f) (g x))
+= bind x (fun y => pure (f (g y)))
+-/
+
+/-
+Applicative contract
+-- E1 <*> E2 = Seq.seq E1 (fun () => E2)
+
+1. pure id <*> v = v
+pure id <*> v
+= seq (pure id) (fun () => v)
+= bind (pure id) fun y => Functor.map y ((fun () => v) ())
+= bind (pure id) fun y => Functor.map y v
+= (fun y => Functor.map y v) id -- bind (pure v) f = f v
+= Functor.map id v
+= v -- Functor contract 1. (id <$> x =) map id x = x
+2. pure (· ∘ ·) <*> u <*> v <*> w = u <*> (v <*> w)
+pure (· ∘ ·) <*> u <*> v <*> w
+= seq (pure (· ∘ ·)) (fun () => u) <*> v <*> w
+= bind (pure (· ∘ ·)) fun z => Functor.map z ((fun () => u) ()) <*> v <*> w
+= bind (pure (· ∘ ·)) fun z => Functor.map z u) <*> v <*> w
+= (fun z => Functor.map z u) (· o ·) <*> v <*> w
+-- bind (pure v) f = f v
+= Functor.map (· o ·) u <*> v <*> w
+= bind u (Function.comp pure (· o ·)) <*> v <*> w
+= seq (bind u (Function.comp pure (· o ·))) (fun () => v) <*> w
+= bind (bind u (Function.comp pure (· o ·))) fun a => Functor.map a ((fun () => v) ()) <*> w
+= bind (bind u (Function.comp pure (· o ·))) fun a => Functor.map a v <*> w
+= bind u (fun z => bind ((Function.comp pure (· o ·)) z) (fun a => Functor.map a v)) <*> w
+-- bind (bind v f) g = bind v (fun x => bind (f x) g)
+= bind u (fun z => bind (pure (z o ·)) (fun a => Functor.map a v)) <*> w
+= bind u (fun z => (fun a => Functor.map a v) (z o ·)) <*> w
+-- bind (pure v) f = f v
+= bind u (fun z => Functor.map (z o ·) v) <*> w
+= seq (bind u (fun z => Functor.map (z o ·) v)) (fun () => w)
+= bind (bind u (fun z => Functor.map (z o ·) v)) (fun a => Functor.map a ((fun () => w) ()))
+= bind (bind u (fun z => Functor.map (z o ·) v)) (fun a => Functor.map a w)
+= bind u (fun b => bind ((fun z => Functor.map (z o ·) v) b) (fun a => Functor.map a w))
+-- bind (bind v f) g = bind v (fun x => bind (f x) g)
+= bind u (fun b => bind (Functor.map (b o ·) v) (fun a => Functor.map a w))
+= bind u (fun b => bind (bind v (Function.comp pure (b o ·))) (fun a => Functor.map a w))
+= bind u (fun b => bind v (fun c => bind ((Function.comp pure (b o ·)) c) (fun a => Functor.map a w))
+-- bind (bind v f) g = bind v (fun x => bind (f x) g)
+= bind u (fun b => bind v (fun c => bind (pure ((b o ·) c)) (fun a => Functor.map a w))
+= bind u (fun b => bind v (fun c => bind (pure (b o c)) (fun a => Functor.map a w))
+-- bind (pure v) f = f v
+= bind u (fun b => bind v (fun c => (fun a => Functor.map a w) (b o c)))
+= bind u (fun b => bind v (fun c => Functor.map (b o c) w))
+= bind u (fun b => bind v (fun c => bind w (Function.comp pure (b o c))))
+= bind u (fun b => bind v (fun c => bind w (fun z => pure ((b o c) z))))
+= bind u (fun b => bind v (fun c => bind w (fun z => pure (b (c z)))))
+
+u <*> (v <*> w)
+= u <*> seq v (fun () => w)
+= u <*> bind v fun y => Functor.map y ((fun () => w) ())
+= u <*> bind v fun y => Functor.map y w
+= u <*> bind v fun y => bind w (Function.comp pure y)
+= u <*> bind v fun y => bind w (fun x => pure (y x))
+= seq u (fun () => bind v fun y => bind w (fun x => pure (y x)))
+= bind u fun z => Functor.map z ((fun () => bind v fun y => bind w (fun x => pure (y x))) ())
+= bind u fun z => Functor.map z (bind v fun y => bind w (fun x => pure (y x)))
+= bind u fun z => bind (bind v fun y => bind w (fun x => pure (y x))) (Function.comp pure z)
+= bind u fun z => bind v (fun a => bind ((fun y => bind w (fun x => pure (y x))) a) (Function.comp pure z))
+-- bind (bind v f) g = bind v (fun x => bind (f x) g)
+= bind u fun z => bind v (fun a => bind (bind w (fun x => pure (a x))) (Function.comp pure z))
+= bind u fun z => bind v (fun a => bind w (fun b => bind ((fun x => pure (a x)) b) (Function.comp pure z))
+= bind u fun z => bind v (fun a => bind w (fun b => bind (pure (a b)) (Function.comp pure z))
+-- bind (bind v f) g = bind v (fun x => bind (f x) g)
+= bind u fun z => bind v (fun a => bind w (fun b => bind (pure (a b)) (Function.comp pure z)))
+= bind u fun z => bind v (fun a => bind w (fun b => (Function.comp pure z) (a b)))
+= bind u fun z => bind v (fun a => bind w (fun b => pure (z (a b))))
+-- bind (pure v) f = f v
+3. pure f <*> pure x = pure (f x)
+pure f <*> pure x
+= seq (pure f) (fun () => pure x)
+= bind (pure f) fun y => Functor.map y ((fun () => pure x) ())
+= bind (pure f) fun y => Functor.map y (pure x)
+= (fun y => Functor.map y (pure x)) f -- bind (pure v) f = f v
+= Functor.map f (pure x)
+= bind (pure x) (Function.comp pure f)
+= (Function.comp pure f) x -- bind (pure v) f = f v
+= pure (f x)
+4. u <*> pure x = pure (fun f => f x) <*> u
+u <*> pure x
+= seq u (fun () => pure x)
+= bind u fun y => Functor.map y ((fun () => pure x) ())
+= bind u fun y => Functor.map y (pure x)
+= bind u fun y => bind (pure x) (Fuction.comp pure y)
+= bind u fun y => (Function.comp pure y) x -- bind (pure v) f = f v
+= bind u fun y => pure (y x)
+pure (fun f => f x) <*> u
+= seq (pure (fun f => f x)) (fun () => u)
+= bind (pure (fun f => f x)) fun y => Functor.map y ((fun () => u) ())
+= bind (pure (fun f => f x)) fun y => Functor.map y u
+= (fun y => Functor.map y u) (fun f => f x) -- bind (pure v) f = f v
+= Functor.map (fun f => f x) u
+= bind u (Function.comp pure (fun f => f x))
+= bind u fun y => (Function.comp pure (fun f => f x)) y
+= bind u fun y => pure ((fun f => f x) y)
+= bind u fun y => pure (y x)
+-/
+
+/-
+  map f x      := bind x (Function.comp pure f)
+  seq f x      := bind f fun y => Functor.map y (x ())
+-/

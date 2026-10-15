@@ -400,44 +400,22 @@ instance [Monad m] : MonadLift m (StateT σ m) where
 
 /- 6.2.6.2. Logging Transformer -/
 
-/-
-def okState (x : α) : State σ α :=
-  fun s => (s, x)
-def getState : State σ σ :=
-  fun s => (s, s)
-def setState (s: σ) : State σ Unit :=
-  fun _ => (s, ())
-def andThenState (first : State σ α) (next : α → State σ β) : State σ β :=
-  fun s =>
-    let (s', x) := first s
-    next x s'
-
-class MyMonadState (σ : outParam (Type u)) (m: Type u → Type v) :
-    Type (max (u+1) v) where
-  get : m σ
-  set : σ → m PUunit
-  modifyGet : (σ → α × σ) → m α
--/
-
 structure WithLog' (logged : Type u) (α : Type u) where
   log : List logged
   val : α
 deriving Repr
 
-def andThenLog' (result : WithLog' α β) (next : β → WithLog' α γ) : WithLog' α γ :=
+def WithLog'.andThen (result : WithLog' α β) (next : β → WithLog' α γ) : WithLog' α γ :=
     let {log := thisOut, val := thisRes} := result
     let {log := nextOut, val := nextRes} := next thisRes
     {log := thisOut ++ nextOut, val := nextRes}
-def okLog' (x : β) : WithLog' α β := {log := [], val := x}
-def saveLog' (data : α) : WithLog' α PUnit :=
+def WithLog'.ok (x : β) : WithLog' α β := {log := [], val := x}
+def WithLog'.save (data : α) : WithLog' α PUnit :=
   {log := [data], val := ()}
 
 instance : Monad (WithLog' σ) where
-  pure x := WithLog'.mk [] x
-  bind result next :=
-    let {log := thisOut, val := thisRes} := result
-    let {log := nextOut, val := nextRes} := next thisRes
-    {log := thisOut ++ nextOut, val := nextRes}
+  pure := WithLog'.ok
+  bind := WithLog'.andThen
 
 def WithLogT (σ : Type u) (m : Type u → Type v) (α : Type u) : Type v :=
   m (WithLog' σ α)
@@ -447,32 +425,31 @@ def WithLogT.run (x : WithLogT σ m α) : m (WithLog' σ α) := x
 
 instance [Monad m] : Monad (WithLogT σ m) where
   pure x := WithLogT.mk (pure {log := [], val := x})
-  bind result next := WithLogT.mk do
-    let {log := thisOut, val := thisRes} ← result
-    let {log := nextOut, val := nextRes} ← next thisRes
-    pure {log := thisOut ++ nextOut, val := nextRes}
+  bind action next := WithLogT.mk do
+    let {log := log₁, val := value} ← WithLogT.run action
+    let {log := log₂, val := result} ← WithLogT.run (next value)
+    pure {log := log₁ ++ log₂, val := result}
 
 class MonadWithLog (σ : outParam (Type u)) (m: Type u → Type v) :
     Type (max (u+1) v) where
-  ok (x : β) : m β
   save :  σ → m PUnit
-open MonadWithLog (ok save)
+open MonadWithLog (save)
 
 instance [Monad m] : MonadLift m (WithLogT σ m) where
   monadLift action := WithLogT.mk do pure {log := [], val := (← action)}
 
-instance [Monad m] : MonadLift (WithLog' σ) (WithLogT σ m) where
-  monadLift action := WithLogT.mk (pure action)
+-- preserve log and value
+def WithLogT.fromWithLog [Pure m]
+    (x : WithLog' σ α) : WithLogT σ m α :=
+  WithLogT.mk (pure x)
 
 instance [Monad m] : MonadWithLog σ (WithLogT σ m) where
-  ok x := WithLogT.mk (return (okLog' x))
-  save x := WithLogT.mk (return (saveLog' x))
+  save x := WithLogT.mk (return (WithLog'.save x))
 
-instance [Monad m] : MonadWithLog σ (ExceptT ε (WithLogT σ m)) where
-  ok x := return x
-  save x := WithLogT.mk (pure ({log := [x], val := pure ()}))
+instance [Monad m] [MonadWithLog σ m]: MonadWithLog σ (ExceptT ε m) where
+  save x := liftM (MonadWithLog.save x : m PUnit)
 
-instance [Monad m] : MonadExcept ε (WithLogT σ (ExceptT ε m)) where
+instance [Monad m] [MonadExcept ε m]: MonadExcept ε (WithLogT σ m) where
   throw e := WithLogT.mk (throw e)
   tryCatch m handler :=
     WithLogT.mk <|
@@ -498,10 +475,10 @@ open BinTree in
 def dTree :=
   branch
     (branch
-      (branch leaf "5" (branch leaf "3" leaf))
+      (branch leaf "4" (branch leaf "3" leaf))
       "a"
       leaf)
-    "4"
+    "5"
     (branch leaf "1" leaf)
 
 inductive ConvErr where
@@ -514,14 +491,79 @@ def convLogEven [Monad m] [MonadExcept ConvErr m] [MonadWithLog Nat m] (s : Stri
   | some n =>
       if n % 2 == 0 then
         save n
-      else
-        pure ()
-      pure n
+      return n
 
 #eval BinTree.mapM (m := ExceptT ConvErr (WithLogT Nat Id)) convLogEven cTree
 #eval BinTree.mapM (m := WithLogT Nat (ExceptT ConvErr Id)) convLogEven cTree
 #eval BinTree.mapM (m := ExceptT ConvErr (WithLogT Nat Id)) convLogEven dTree
 #eval BinTree.mapM (m := WithLogT Nat (ExceptT ConvErr Id)) convLogEven dTree
+
+def ExceptT_WithLogT := ExceptT ConvErr (WithLogT Nat Id) Nat
+def WithLogT_ExceptT := WithLogT Nat (ExceptT ConvErr Id) Nat
+
+def testLogging
+    [Monad m] [MonadExcept ConvErr m]
+    [MonadWithLog Nat m] : m Nat := do
+  MonadWithLog.save 2
+  MonadWithLog.save 4
+  pure 0
+
+def testLoggingAndException
+    [Monad m] [MonadExcept ConvErr m]
+    [MonadWithLog Nat m] : m Nat := do
+  MonadWithLog.save 2
+  MonadWithLog.save 4
+  throw (.notANat "invalid")
+
+def testCatch
+    [Monad m] [MonadExcept ConvErr m]
+    [MonadWithLog Nat m] : m Nat := do
+  tryCatch
+    do
+      MonadWithLog.save 2
+      throw (.notANat "invalid")
+      MonadWithLog.save 3
+      pure 0
+    fun _ => do
+      MonadWithLog.save 4
+      pure 0
+
+def testRethrow
+    [Monad m] [MonadExcept ConvErr m]
+    [MonadWithLog Nat m] : m Nat := do
+  tryCatch
+    do
+      MonadWithLog.save 2
+      throw (.notANat "invalid")
+      MonadWithLog.save 3
+      pure 0
+    fun e => do
+      MonadWithLog.save 4
+      throw e
+
+#eval (testLogging : ExceptT_WithLogT)
+-- { log := [2, 4], val := Except.ok 0 }
+
+#eval (testLoggingAndException : ExceptT_WithLogT)
+-- { log := [2, 4], val := Except.error (ConvErr.notANat "invalid") }
+
+#eval (testCatch : ExceptT_WithLogT)
+-- { log := [2, 4], val := Except.ok 0 }
+
+#eval (testRethrow : ExceptT_WithLogT)
+-- { log := [2, 4], val := Except.error (ConvErr.notANat "invalid") }
+
+#eval (testLogging : WithLogT_ExceptT)
+-- Except.ok { log := [2, 4], val := 0 }
+
+#eval (testLoggingAndException : WithLogT_ExceptT)
+-- Except.error (ConvErr.notANat "invalid")
+
+#eval (testCatch : WithLogT_ExceptT)
+-- Except.ok { log := [4], val := 0 }
+
+#eval (testRethrow : WithLogT_ExceptT)
+-- Except.error (ConvErr.notANat "invalid")
 
 ---- TODO : Exercises
 

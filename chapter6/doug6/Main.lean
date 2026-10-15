@@ -28,7 +28,11 @@ def Config.preDir (cfg : Config) :=
 def Config.inDirectory (cfg : Config) : Config :=
   {cfg with currentPrefix := cfg.preDir ++ " " ++ cfg.currentPrefix}
 
-abbrev ConfigIO (α : Type) : Type := ReaderT Config IO α
+structure Count where
+  fileCount : Nat := 0
+  dirCount : Nat := 0
+
+abbrev ConfigIO (α : Type) : Type := ReaderT Config (StateT Count IO) α
 
 instance : Monad ConfigIO where
   pure x := fun _ => pure x
@@ -37,8 +41,7 @@ instance : Monad ConfigIO where
     next v cfg
 
 def ConfigIO.run (action : ConfigIO α) (cfg : Config) : IO α :=
-  action cfg
-
+  do pure (← action cfg {}).fst
 def usage : String :=
   "Usage: doug [--ascii] [-a] [root]
 Options:
@@ -74,9 +77,13 @@ def dirLT (e1 : IO.FS.DirEntry) (e2 : IO.FS.DirEntry) : Bool :=
   e1.fileName < e2.fileName
 
 def showFileName (file : String) : ConfigIO Unit := do
+  let count ← get
+  set {count with fileCount := count.fileCount + 1}
   IO.println s!"{(← read).currentPrefix}{(← read).preFile} {file}"
 
 def showDirName (dir : String) : ConfigIO Unit := do
+  let count ← get
+  set {count with dirCount := count.dirCount + 1}
   IO.println s!"{(← read).currentPrefix}{(← read).preFile} {dir}/"
 
 def doList [Applicative f] : List α → (α → f Unit) → f Unit
@@ -85,7 +92,7 @@ def doList [Applicative f] : List α → (α → f Unit) → f Unit
     action x *>
     doList xs action
 
-partial def dirTree (path : System.FilePath) : ConfigIO Unit := do
+partial def dirTree (path : System.FilePath) (showStat : Bool) : ConfigIO Unit := do
   match ← toEntry path with
   | none => pure ()
   | some (.file name) => showFileName name
@@ -94,13 +101,16 @@ partial def dirTree (path : System.FilePath) : ConfigIO Unit := do
     let contents ← path.readDir
     withReader (·.inDirectory)
       (doList (contents.qsort dirLT).toList fun d =>
-        dirTree d.path)
+        dirTree d.path false)
+  if showStat then
+    let count ← get
+    IO.println s!"Viewed {count.fileCount} files in {count.dirCount} directories"
 
 def main (args : List String) : IO UInt32 := do
   match configFromArgs args with
   | some config =>
     let root ← if config.root == "." then IO.currentDir else pure ⟨config.root⟩
-    (dirTree root).run config
+    (dirTree root true).run config
     pure 0
   | none =>
     IO.eprintln s!"Didn't understand argument(s) {" ".separate args}\n"
